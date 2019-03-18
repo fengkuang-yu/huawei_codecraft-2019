@@ -8,7 +8,6 @@
 @Desc    :
 """
 
-import os
 from collections import defaultdict
 from heapq import *
 
@@ -16,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 
-def read_data(file_path):
+def read_data(car_path, road_path, cross_path):
     """
     从给定的路径读取数据
     :param filepath: 数据路径
@@ -36,9 +35,9 @@ def read_data(file_path):
             data = pd.DataFrame(data, columns=head)
         return data
 
-    carData = read_from_txt(os.path.join(file_path, 'car.txt'))
-    roadData = read_from_txt(os.path.join(file_path, 'road.txt'))
-    crossData = read_from_txt(os.path.join(file_path, 'cross.txt'))
+    carData = read_from_txt(car_path)
+    roadData = read_from_txt(road_path)
+    crossData = read_from_txt(cross_path)
     return (carData, roadData, crossData)
 
 
@@ -195,7 +194,7 @@ def write_answer_file(answer_list, answer_path):
     :param answer_path:
     :return:
     """
-    with open(os.path.join(answer_path, 'answer.txt'), 'w') as f:
+    with open(answer_path, 'w') as f:
         f.write('#(carId,StartTime,RoadID...)')
         for cur_line in answer_list:
             f.write('\n')
@@ -203,17 +202,41 @@ def write_answer_file(answer_list, answer_path):
     return
 
 
-class road:
-    def __init__(self, length, v_lim, num_lanes):
+class Car:
+    def __init__(self, v_car, path):
+        self.v_car = v_car
+        self.dir = path
+        # 车辆的状态0表示终止 v_car <= s1，1表示等待行驶v_car > s1
+        self.state = 0
+        self.s1 = min()
+        self.s2 = min()
+
+class Road:
+    def __init__(self, id, length, v_lim, lan_nums):
+        self.id = id
         self.length = length
         self.v_lim = v_lim
-        self.num_lanes = num_lanes
-        for i in range(self.lan_num):
-            pass
+        self.num_lane = lan_nums
+        self.lane = []
+        for i in range(lan_nums):
+            self.lane.append([])
 
+    def allocate_car(self, car_list):
+        temp = self.lane[0].pop()
+
+def coordinate_cross(cross_road_map):
+
+    pass
 
 if __name__ == '__main__':
-    file_path = r'D:\Users\yyh\Pycharm_workspace\leetcode'
-    carData, roadData, crossData = read_data(file_path)
+    answer_path = r'D:\Users\yyh\Pycharm_workspace\leetcode\answer.txt'
+    road_path = r'D:\Users\yyh\Pycharm_workspace\leetcode\road.txt'
+    car_path = r'D:\Users\yyh\Pycharm_workspace\leetcode\car.txt'
+    cross_path = r'D:\Users\yyh\Pycharm_workspace\leetcode\cross.txt'
+
+    carData, roadData, crossData = read_data(car_path, road_path, cross_path)
     cross_road_map, adjacent_matrix, edges = create_road_between_cross_graph(roadData, crossData)
-    answer_node, answer = generate_answer(carData, r'D:\Users\yyh\Pycharm_workspace\leetcode', edges, cross_road_map)
+    answer_node_path = generate_cross_path(carData, edges)
+    answer_road_path = generate_answer(answer_node_path, cross_road_map)
+    answer_road_path = update_departure_time(answer_road_path)
+    write_answer_file(answer_road_path, answer_path)
