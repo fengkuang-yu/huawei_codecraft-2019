@@ -202,31 +202,64 @@ def write_answer_file(answer_list, answer_path):
     return
 
 
-class Car:
-    def __init__(self, v_car, path):
-        self.v_car = v_car
-        self.dir = path
-        # 车辆的状态0表示终止 v_car <= s1，1表示等待行驶v_car > s1
-        self.state = 0
-        self.s1 = min()
-        self.s2 = min()
+# class Car:
+#     def __init__(self, v_car, path):
+#         self.v_car = v_car
+#         self.path = path
+#         self.cur_rode = path[0]
+#         # 车辆的状态0表示终止 v_car <= s1，1表示等待行驶v_car > s1
+#         self.state = 0
+#         self.s1 = min()
+#         self.s2 = min()
+#
+# class Road:
+#     def __init__(self, id, length, v_lim, lan_nums):
+#         self.id = id
+#         self.length = length
+#         self.v_lim = v_lim
+#         self.num_lane = lan_nums
+#         self.lane = []
+#         for i in range(lan_nums):
+#             self.lane.append([])
+#
+#     def allocate_car(self, car_list):
+#         temp = self.lane[0].pop()
+#
+# def coordinate_cross(cross_road_map):
+#
+#     pass
+#
+#
+# def mark_car():
+#     for road in road_all:
 
-class Road:
-    def __init__(self, id, length, v_lim, lan_nums):
-        self.id = id
-        self.length = length
-        self.v_lim = v_lim
-        self.num_lane = lan_nums
-        self.lane = []
-        for i in range(lan_nums):
-            self.lane.append([])
+def generate_road_map(roadData, carData, answer_road_path):
+    """
+    生成道路的车辆数据
+    :param roadData:
+    :return:车辆的
+    """
+    road_map = dict()
+    car_map = dict()
+    answer_map = dict()
+    for i in range(len(roadData)):
+        road_map[roadData.loc[i].id] = \
+            [[[] for _ in range(roadData.loc[i].channel)] for _ in range(roadData.loc[i].isDuplex + 1)]
 
-    def allocate_car(self, car_list):
-        temp = self.lane[0].pop()
+    for i in range(len(carData)):
+        # list(state, speed, direction, s1)
+        # 其中state 可选0,1
+        # direction 可选0,1,2分别表示直行、左拐和右拐
+        # s1表示当前路段剩余道路
+        car_map[carData.loc[i].id] = [0, 0, 0, 0]
 
-def coordinate_cross(cross_road_map):
+    for i in range(len(answer_road_path)):
+        # answer_map是车辆的行驶线路map
+        answer_map[answer_road_path[i][0]] = answer_road_path[i][2:]
 
-    pass
+    return road_map, car_map, answer_map
+
+
 
 if __name__ == '__main__':
     answer_path = r'D:\Users\yyh\Pycharm_workspace\leetcode\answer.txt'

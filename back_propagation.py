@@ -1,227 +1,158 @@
-# -*- coding: utf-8 -*-
-
-"""
-@Author  :   {Yu Yinghao}
-@Software:   PyCharm
-@File    :   back_propagation.py
-@Time    :   2019/3/15 9:45
-@Desc    :
-"""
-
-import math
-import random
-
-random.seed(0)
-
-
-def rand(a, b):
+def generate_road_map(roadData, carData, answer_road_path):
     """
-    创建一个满足 a <= rand < b 的随机数
-    :param a:
-    :param b:
+    生成道路的车辆数据
+    :param roadData:
+    :return:车辆的
+    """
+    road_map = dict()
+    car_map = dict()
+    answer_map = dict()
+    for i in range(len(roadData)):
+        road_map[roadData.loc[i].id] = \
+            [[[] for _ in range(roadData.loc[i].channel)] for _ in range(roadData.loc[i].isDuplex + 1)]
+
+    for i in range(len(carData)):
+        # list(state, speed, direction, s1)
+        # 其中state 可选0,1
+        # direction 可选0,1,2分别表示直行、左拐和右拐
+        # s1表示当前路段剩余道路
+        car_map[carData.loc[i].id] = [0, 0, 0, 0]
+
+    for i in range(len(answer_road_path)):
+        # answer_map是车辆的行驶线路map
+        answer_map[answer_road_path[i][0]] = answer_road_path[i][2:]
+
+    return road_map, car_map, answer_map
+
+road_map, car_map, answer_map = generate_road_map()
+
+class Car:
+    def __init__(self, id, v_lim, s1, length, state=0):
+        self.id = id
+        self.v_lim = v_lim
+        self.s1 = s1
+        self.state = state
+        self.channel = []
+        self.road_length = length
+
+    def getChannel(self, cur_cross: int, cur_road: int, dir: int, cross_map:dict, road_map: dict)->int:
+        """
+        根据当前的条件获取下一条路的流入车道
+        :param cur_cross: 当前交叉路口
+        :param cur_road: 当前道路
+        :param dir: 车辆的转向,1表示左转，2表示直行，3表示右转
+        :return: 进入的车道号
+        """
+        cross_road_list = cross_map[cur_cross]
+        cur_index = cross_road_list.index(cur_road)
+        in_road_index = (cur_index + dir) % 4
+        in_road_number = cross_road_list[in_road_index]
+        # 双向车道，判断是走正还是反
+        in_road = road_map[in_road_number][0] if in_road_index < 2 else road_map[in_road_number][1]
+        for i in range(len(in_road)):
+            if in_road[i] == [] or in_road[i][-1].s1 < in_road[i][-1].length:
+                return in_road[i]
+        raise Exception('获取进入通道失败')
+
+    def moveToNextRoad(self, channel, r_v_lim, next_road_length):
+        self.channel.remove(self)
+        self.channel = channel
+        self.s1 = next_road_length - (min(self.v_lim, r_v_lim) - self.s1)
+        self.state = 0
+        self.road_length = next_road_length
+        channel.append(self)
+
+
+def one_second(road_info, road_map, answer_map, roadData, cross_map):
+    """
+
+    :param road_info: 存放路的全部信息的dict
+    :param road_map: 存放车的dict
+    :param answer_map:
+    :param roadData:
+    :param cross_map:
     :return:
     """
-    return (b - a) * random.random() + a
+
+    def getCarFromRoad(road: int, dir: int)->Car:
+        # 判断当前路段的车辆判断顺序
+
+        pass
+
+    def drive_car_in_road_to_end(channel:list, wait_cars:list):
+        if not channel:
+            return
+
+        # 先对车道内的车辆进行标记,0表示终止状态，1表示等待状态
+        if channel[0].s1 < channel[0].v_lim:
+            channel[0].state = 0
+            channel[0].s1 -= channel[0].v_lim
+        else:
+            channel[0].state = 1
+            wait_cars.append(cur_channel[0])
+
+        for i in range(1, len(channel)):
+            if channel[i - 1].state == 0 or channel[i].s1 - channel[i-1] < channel[i].v_lim:
+                channel[i].state = 0  # 车辆到达终止状态
+                channel[i].s1 = max(channel[i].v_lim, channel[i-1].s1 + 1)  # 移动车辆的位置
+            else:
+                channel[i].state = 1  # 车辆为等待状态
+                wait_cars.append(cur_channel[i])
+        return
+
+    def get_car_direction(car: Car, cur_cross: int, cur_road: int, answer_map: dict, cross_map: dict)->int:
+        car_path_list = answer_map[car.id]
+        cur_index = car_path_list.index(cur_road)
+        if cur_index == len(car_path_list)-1:
+            # 进入此处表示出现错误
+            print('error in "get_car_direction"')
+            return 0
+        in_road = car_path_list[cur_index + 1]
+        start = cross_map[cur_cross].index(cur_road)
+        end = cross_map[cur_cross].index(in_road)
+        return (end + 4 - start) % 4
+
+    def get_road_direction(cur_road, cur_cross):
+        # 获取当前道路的优先级list()
+        # 取当前每个通道的第一辆车判断优先级是否符合
+        pass
+
+    def is_conflict(cur_road, cur_cross, dir, ):
+        if
+
+        if dir == 2:
+            return False
+        if dir == 1:
+
+        pass
+
+    wait_cars = []
+    for cur_road_num in road_map:
+        for cur_road in road_map[cur_road_num]:
+            for cur_channel in cur_road:
+                drive_car_in_road_to_end(cur_channel, wait_cars)
+
+    while wait_cars:
+        for cur_cross in cross_map:
+            cross_road_list = list(filter(lambda x: x != -1, cross_map[cur_cross]))
+            cross_road_list.sort()
+            for cur_road in cross_road_list:
+                road_dir = 1
+                if road_info[cur_road][5] == cur_cross:
+                    road_dir = 0  # 表示路是正向的，从start -> end
+
+                # 现在的车可以走的方向
+                dir = get_road_direction(car, cur_cross, cur_road, answer_map, cross_map)
+                car = getCarFromRoad(cur_road, dir)
+                conflict = is_conflict()
+                if conflict:
+                    break
+                channel = car.getChannel()
+                car.moveToNextRoad(channel, r_v_lim, next_road_length)
+                drive_car_in_road_to_end(cur_channel)
 
 
-def makeMatrix(I, J, fill=0.0):
-    """
-    创建一个矩阵（可以考虑用NumPy来加速）
-    :param I: 行数
-    :param J: 列数
-    :param fill: 填充元素的值
-    :return:
-    """
-    m = []
-    for i in range(I):
-        m.append([fill] * J)
-    return m
+def driveCarIntoRoad(answer_map):
+    # 将车库内的车安排上路
+    pass
 
-
-def randomizeMatrix(matrix, a, b):
-    """
-    随机初始化矩阵
-    :param matrix:
-    :param a:
-    :param b:
-    """
-    for i in range(len(matrix)):
-        for j in range(len(matrix[0])):
-            matrix[i][j] = random.uniform(a, b)
-
-
-def sigmoid(x):
-    """
-    sigmoid 函数，1/(1+e^-x)
-    :param x:
-    :return:
-    """
-    return 1.0 / (1.0 + math.exp(-x))
-
-
-def dsigmoid(y):
-    """
-    sigmoid 函数的导数
-    :param y:
-    :return:
-    """
-    return y * (1 - y)
-
-
-class NN:
-    def __init__(self, ni, nh, no):
-        # number of input, hidden, and output nodes
-        """
-        构造神经网络
-        :param ni:输入单元数量
-        :param nh:隐藏单元数量
-        :param no:输出单元数量
-        """
-        self.ni = ni + 1  # +1 是为了偏置节点
-        self.nh = nh
-        self.no = no
-
-        # 激活值（输出值）
-        self.ai = [1.0] * self.ni
-        self.ah = [1.0] * self.nh
-        self.ao = [1.0] * self.no
-
-        # 权重矩阵
-        self.wi = makeMatrix(self.ni, self.nh)  # 输入层到隐藏层
-        self.wo = makeMatrix(self.nh, self.no)  # 隐藏层到输出层
-        # 将权重矩阵随机化
-        randomizeMatrix(self.wi, -0.2, 0.2)
-        randomizeMatrix(self.wo, -2.0, 2.0)
-        # 权重矩阵的上次梯度
-        self.ci = makeMatrix(self.ni, self.nh)
-        self.co = makeMatrix(self.nh, self.no)
-
-    def runNN(self, inputs):
-        """
-        前向传播进行分类
-        :param inputs:输入
-        :return:类别
-        """
-        if len(inputs) != self.ni - 1:
-            print('incorrect number of inputs')
-
-        for i in range(self.ni - 1):
-            self.ai[i] = inputs[i]
-
-        for j in range(self.nh):
-            sum = 0.0
-            for i in range(self.ni):
-                sum += (self.ai[i] * self.wi[i][j])
-            self.ah[j] = sigmoid(sum)
-
-        for k in range(self.no):
-            sum = 0.0
-            for j in range(self.nh):
-                sum += (self.ah[j] * self.wo[j][k])
-            self.ao[k] = sigmoid(sum)
-
-        return self.ao
-
-    def backPropagate(self, targets, N, M):
-        """
-        后向传播算法
-        :param targets: 实例的类别
-        :param N: 本次学习率
-        :param M: 上次学习率
-        :return: 最终的误差平方和的一半
-        """
-        # http://www.youtube.com/watch?v=aVId8KMsdUU&feature=BFa&list=LLldMCkmXl4j9_v0HeKdNcRA
-
-        # 计算输出层 deltas
-        # dE/dw[j][k] = (t[k] - ao[k]) * s'( SUM( w[j][k]*ah[j] ) ) * ah[j]
-        output_deltas = [0.0] * self.no
-        for k in range(self.no):
-            error = targets[k] - self.ao[k]
-            output_deltas[k] = error * dsigmoid(self.ao[k])
-
-        # 更新输出层权值
-        for j in range(self.nh):
-            for k in range(self.no):
-                # output_deltas[k] * self.ah[j] 才是 dError/dweight[j][k]
-                change = output_deltas[k] * self.ah[j]
-                self.wo[j][k] += N * change + M * self.co[j][k]
-                self.co[j][k] = change
-
-        # 计算隐藏层 deltas
-        hidden_deltas = [0.0] * self.nh
-        for j in range(self.nh):
-            error = 0.0
-            for k in range(self.no):
-                error += output_deltas[k] * self.wo[j][k]
-            hidden_deltas[j] = error * dsigmoid(self.ah[j])
-
-        # 更新输入层权值
-        for i in range(self.ni):
-            for j in range(self.nh):
-                change = hidden_deltas[j] * self.ai[i]
-                # print 'activation',self.ai[i],'synapse',i,j,'change',change
-                self.wi[i][j] += N * change + M * self.ci[i][j]
-                self.ci[i][j] = change
-
-        # 计算误差平方和
-        # 1/2 是为了好看，**2 是平方
-        error = 0.0
-        for k in range(len(targets)):
-            error = 0.5 * (targets[k] - self.ao[k]) ** 2
-        return error
-
-    def weights(self):
-        """
-        打印权值矩阵
-
-        """
-        print('Input weights:')
-        for i in range(self.ni):
-            print(self.wi[i])
-        print('')
-        print('Output weights:')
-        for j in range(self.nh):
-            print(self.wo[j])
-        print('')
-
-    def test(self, patterns):
-        """
-        测试
-        :param patterns:测试数据
-        """
-        for p in patterns:
-            inputs = p[0]
-            print('Inputs:', p[0], '-->', self.runNN(inputs), '\tTarget', p[1])
-
-    def train(self, patterns, max_iterations=1000, N=0.5, M=0.1):
-        """
-        训练
-        :param patterns:训练集
-        :param max_iterations:最大迭代次数
-        :param N:本次学习率
-        :param M:上次学习率
-        """
-        for i in range(max_iterations):
-            for p in patterns:
-                inputs = p[0]
-                targets = p[1]
-                self.runNN(inputs)
-                error = self.backPropagate(targets, N, M)
-            if i % 50 == 0:
-                print('Combined error', error)
-        self.test(patterns)
-
-
-def main():
-    pat = [
-        [[0, 0], [0]],
-        [[0, 1], [1]],
-        [[1, 0], [1]],
-        [[1, 1], [0]]
-    ]
-    myNN = NN(2, 2, 1)
-    myNN.train(pat)
-
-
-if __name__ == "__main__":
-    main()
