@@ -23,7 +23,10 @@ def generate_road_map(roadData, crossData, answer_road_path):
 
     return road_map, road_info, answer_map, cross_map
 
+
 road_map, car_map, answer_map = generate_road_map(roadData, crossData, answer_road_path)
+
+
 # 对于road_map来说0是正向，1是反向。
 
 class Car:
@@ -35,7 +38,7 @@ class Car:
         self.channel = []
         self.road_length = length
 
-    def getChannel(self, in_road)->int:
+    def getChannel(self, in_road) -> int:
         """
         根据当前的条件获取下一条路的流入车道
         :param cur_cross: 当前交叉路口
@@ -56,6 +59,7 @@ class Car:
         self.road_length = next_road_length
         channel.append(self)
 
+
 def get_car_from_road(cur_road, cur_cross, road_map: dict, cross_map: dict, answer_map: dict, dir: list):
     # 判断当前路段的车辆判断顺序
     road_dir = 0 if cross_map[cur_road].index(cur_road) // 2 else 1
@@ -68,11 +72,12 @@ def get_car_from_road(cur_road, cur_cross, road_map: dict, cross_map: dict, answ
             if dir_order == get_car_direction(car_order, cur_cross, cur_road, cross_map, answer_map):
                 return dir_order, car_order
 
-def drive_car_in_road_to_end(cur_road, channel:list, answer_map):
+
+def drive_car_in_road_to_end(cur_road, channel: list, answer_map):
     if not channel:
         return
     # 先对车道内的车辆进行标记,0表示终止状态，1表示等待状态
-    if channel[0].s1 < channel[0].v_lim :
+    if channel[0].s1 < channel[0].v_lim:
         channel[0].state = 0
         channel[0].s1 -= channel[0].v_lim
     else:
@@ -83,17 +88,18 @@ def drive_car_in_road_to_end(cur_road, channel:list, answer_map):
         if answer_map[channel[i].id][-1] == cur_road:
             channel.remove(channel[i])
         # 再判断可以到在道路中不能行驶到终点的车
-        if channel[i - 1].state == 0 or channel[i].s1 - channel[i-1] < channel[i].v_lim:
+        if channel[i - 1].state == 0 or channel[i].s1 - channel[i - 1] < channel[i].v_lim:
             channel[i].state = 0  # 车辆到达终止状态
-            channel[i].s1 = max(channel[i].v_lim, channel[i-1].s1 + 1)  # 移动车辆的位置
+            channel[i].s1 = max(channel[i].v_lim, channel[i - 1].s1 + 1)  # 移动车辆的位置
         else:
             channel[i].state = 1  # 车辆为等待状态
     return
 
-def get_car_direction(car: Car, cur_cross: int, cur_road: int, cross_map: dict, answer_map: dict)->int:
+
+def get_car_direction(car: Car, cur_cross: int, cur_road: int, cross_map: dict, answer_map: dict) -> int:
     car_path_list = answer_map[car.id]
     cur_index = car_path_list.index(cur_road)
-    if cur_index == len(car_path_list)-1:
+    if cur_index == len(car_path_list) - 1:
         # 进入此处表示出现错误
         print('判断车辆是否到达终点的程序出错')
         return 0
@@ -102,11 +108,12 @@ def get_car_direction(car: Car, cur_cross: int, cur_road: int, cross_map: dict, 
     end = cross_map[cur_cross].index(in_road)
     return (end + 4 - start) % 4
 
+
 def get_road_direction(cur_cross: int, cur_road: int, cross_map: dict, road_map: dict, answer_map: dict) -> list:
     # 获取当前道路的优先级list()
     # 取当前每个通道的第一辆车判断优先级是否符合
     dir = []
-    road_out = [1,1,0,0]
+    road_out = [1, 1, 0, 0]
     cur_roads_list = cross_map[cur_cross]
     cur_index = cur_roads_list.index(cur_road)
     left_index = (cur_index + 1) % 4
@@ -148,11 +155,12 @@ def get_road_direction(cur_cross: int, cur_road: int, cross_map: dict, road_map:
         for temp_car in channel_top_car:
             if temp_car.state == 1:
                 temp_dir.append(get_car_direction(temp_car, cur_cross, cur_road, cross_map, answer_map))
-        if  2 not in temp_dir and 1 in temp_dir:
+        if 2 not in temp_dir and 1 in temp_dir:
             dir.remove(3)
     return dir
 
-def get_in_road(cur_cross: int, cur_road: int, dir: int, cross_map:dict, road_map: dict):
+
+def get_in_road(cur_cross: int, cur_road: int, dir: int, cross_map: dict, road_map: dict):
     cross_road_list = cross_map[cur_cross]
     cur_index = cross_road_list.index(cur_road)
     in_road_index = (cur_index + dir) % 4
@@ -161,8 +169,8 @@ def get_in_road(cur_cross: int, cur_road: int, dir: int, cross_map:dict, road_ma
     in_road = road_map[in_road_number][0] if in_road_index < 2 else road_map[in_road_number][1]
     return in_road
 
-def one_second(road_info, road_map, answer_map, cross_map):
 
+def one_second(road_info, road_map, answer_map, cross_map):
     wait_cars = []
     for cur_road_num in road_map:
         for cur_road in road_map[cur_road_num]:
@@ -194,8 +202,8 @@ def one_second(road_info, road_map, answer_map, cross_map):
                     road_road_wait_car.remove(car)
                     drive_car_in_road_to_end(cur_road, channel, answer_map)
 
+
 def drive_car_into_road(answer_map):
     # 将车库内的车安排上路
     ans
     pass
-
