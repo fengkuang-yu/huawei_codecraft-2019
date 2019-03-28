@@ -202,37 +202,6 @@ def write_answer_file(answer_list, answer_path):
     return
 
 
-# class Car:
-#     def __init__(self, v_car, path):
-#         self.v_car = v_car
-#         self.path = path
-#         self.cur_rode = path[0]
-#         # 车辆的状态0表示终止 v_car <= s1，1表示等待行驶v_car > s1
-#         self.state = 0
-#         self.s1 = min()
-#         self.s2 = min()
-#
-# class Road:
-#     def __init__(self, id, length, v_lim, lan_nums):
-#         self.id = id
-#         self.length = length
-#         self.v_lim = v_lim
-#         self.num_lane = lan_nums
-#         self.lane = []
-#         for i in range(lan_nums):
-#             self.lane.append([])
-#
-#     def allocate_car(self, car_list):
-#         temp = self.lane[0].pop()
-#
-# def coordinate_cross(cross_road_map):
-#
-#     pass
-#
-#
-# def mark_car():
-#     for road in road_all:
-
 def generate_road_map(roadData, carData, answer_road_path):
     """
     生成道路的车辆数据
