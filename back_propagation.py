@@ -163,7 +163,7 @@ def update_departure_time(answer_road_path):
         #     temp_from = answer_total[i_car][2]
         #     carNum = answer_total[i_car][1]
         answer_road_path[i_car][1] = carNum
-        if count % 3 == 0:
+        if count % 1 == 0:
             carNum += 1
         count += 1
     return answer_road_path
@@ -185,13 +185,14 @@ def write_answer_file(answer_list, answer_path):
 
 
 class Car:
-    def __init__(self, id, v_lim, s1, length, channel, cur_road_num, state=0):
+    def __init__(self, id, v_lim, s1, length, channel, cur_road_num, is_reverse, state=0):
         self.id = id
         self.v_lim = v_lim
         self.s1 = s1
         self.state = state
         self.channel = channel
         self.road_length = length
+        self.is_reverse = is_reverse
         self.cur_road_num = cur_road_num
 
     def getChannel(self, in_road) -> int:
@@ -203,27 +204,30 @@ class Car:
         :return: 进入的车道号
         """
         for i in range(len(in_road)):
-            if in_road[i] == [] or in_road[i][-1].s1 < in_road[i][-1].length - 1:
+            if in_road[i] == [] or in_road[i][-1].s1 < in_road[i][-1].road_length - 1:
                 return in_road[i]
         raise Exception('car.getChannel模块获取进入通道失败')
 
-    def moveToNextRoad(self, channel, cur_road_num, next_road_num, road_info):
+    def moveToNextRoad(self, channel, next_road_num, is_reverse, road_info):
         next_road_length = road_info[next_road_num][0]
         next_road_v_lim = min(road_info[next_road_num][1], self.v_lim)
 
         if next_road_length - self.s1 > 0:
+            old_channel = self.channel
             self.channel.remove(self)
             self.channel = channel
             self.v_lim = next_road_v_lim
             self.s1 = next_road_length - (next_road_v_lim - self.s1)
             self.road_length = next_road_length
             self.state = 0
-            self.cur_road_num = cur_road_num
+            self.is_reverse = is_reverse
+            self.cur_road_num = next_road_num
             channel.append(self)
         else:
+            old_channel = self.channel
             self.state = 0
             self.s1 = 0
-
+        return old_channel
 
 def generate_road_map(roadData, crossData, carData, answer_road_path):
     """
@@ -243,7 +247,7 @@ def generate_road_map(roadData, crossData, carData, answer_road_path):
 
     for i in range(len(answer_road_path)):
         # answer_map是车辆的行驶线路map
-        answer_map[answer_road_path[i][0]] = answer_road_path[i][2:]
+        answer_map[answer_road_path[i][0]] = answer_road_path[i][1:]
 
     for temp in crossData.values:
         cross_map[temp[0]] = list(temp[1:])
@@ -256,64 +260,87 @@ def generate_road_map(roadData, crossData, carData, answer_road_path):
 
 def get_car_from_road(cur_road_num, cur_cross_num, road_map: dict, cross_map: dict, answer_map: dict, dir: list):
     # 判断当前路段的车辆判断顺序
-    road_dir = 0 if cross_map[cur_road_num].index(cur_road_num) // 2 else 1
+    road_dir = 0 if cross_map[cur_cross_num].index(cur_road_num) // 2 else 1
     temp_road = road_map[cur_road_num][road_dir]
     temp_car = []
     for temp_channel in temp_road:
         temp_car += temp_channel[:1]
     for dir_order in dir:
         for car_order in temp_car:
-            if dir_order == get_car_direction(car_order, cur_cross_num, cur_road_num, cross_map, answer_map):
+            if car_order.state == 1 and dir_order == get_car_direction(car_order, cur_cross_num, cross_map, answer_map):
                 return dir_order, car_order
+    raise Exception('没有车应该出库')
 
 
-def drive_car_in_road_to_end(cur_road_num, cur_channel, answer_map):
+def drive_car_in_road_to_end(cur_road_num, cur_channel, answer_map, state):
     wait_cars = []
     stop_cars = []
 
-    # 将车道上能到达终点的车安排到达终点
-    while cur_channel !=[] and \
-            answer_map[cur_channel[0].id][-1] == cur_road_num and \
-            cur_channel[0].s1 < cur_channel[0].v_lim:
-        stop_cars.append(cur_channel[0])
-        cur_channel[0].channel.remove(cur_channel[0])
+    if state == 0:
+        # 将车道上能到达终点的车安排到达终点
+        while cur_channel !=[] and answer_map[cur_channel[0].id][-1] == cur_road_num \
+                and cur_channel[0].s1 < cur_channel[0].v_lim:
+            stop_cars.append(cur_channel[0])
+            cur_channel[0].channel.remove(cur_channel[0])
 
-    # 先对车道内的第一辆车进行标记,0表示终止状态，1表示等待状态
-    if not cur_channel:
-        return wait_cars
-    if cur_channel[0].s1 >= cur_channel[0].v_lim:
-        cur_channel[0].state = 0
-        cur_channel[0].s1 -= cur_channel[0].v_lim
-        stop_cars.append(cur_channel[0])
-    else:
-        cur_channel[0].state = 1
-        wait_cars.append(cur_channel[0])
-
-    # 对车道上的其他车进行标记
-    for i in range(1, len(cur_channel)):
-        if cur_channel[i - 1].state == 0 or cur_channel[i].s1 - cur_channel[i-1].s1 > cur_channel[i].v_lim:
-            cur_channel[i].state = 0  # 车辆到达终止状态
-            cur_channel[i].s1 = max(cur_channel[i].s1 - cur_channel[i].v_lim, cur_channel[i-1].s1 + 1)  # 移动车辆的位置
-            stop_cars.append(cur_channel[i])
+        # 先对车道内的第一辆车进行标记,0表示终止状态，1表示等待状态
+        if not cur_channel:
+            return wait_cars, stop_cars
+        if cur_channel[0].s1 >= cur_channel[0].v_lim:
+            cur_channel[0].state = 0
+            cur_channel[0].s1 -= cur_channel[0].v_lim
+            stop_cars.append(cur_channel[0])
         else:
-            cur_channel[i].state = 1  # 车辆为等待状态
-            wait_cars.append(cur_channel[i])
-    return [wait_cars, stop_cars]
+            cur_channel[0].state = 1
+            wait_cars.append(cur_channel[0])
+
+        # 对车道上的其他车进行标记
+        for i in range(1, len(cur_channel)):
+            if cur_channel[i - 1].state == 0 or (cur_channel[i].s1 - cur_channel[i-1].s1 > cur_channel[i].v_lim):
+                cur_channel[i].state = 0  # 车辆到达终止状态
+                cur_channel[i].s1 = max(cur_channel[i].s1 - cur_channel[i].v_lim, cur_channel[i-1].s1 + 1)  # 移动车辆的位置
+                stop_cars.append(cur_channel[i])
+            else:
+                cur_channel[i].state = 1  # 车辆为等待状态
+                wait_cars.append(cur_channel[i])
+    else:
+        while cur_channel != [] and answer_map[cur_channel[0].id][-1] == cur_road_num \
+                and cur_channel[0].s1 < cur_channel[0].v_lim and cur_channel[0].state == 1:
+            stop_cars.append(cur_channel[0])
+            cur_channel[0].channel.remove(cur_channel[0])
+
+        # 先对车道内的第一辆车进行标记,0表示终止状态，1表示等待状态
+        if not cur_channel:
+            return wait_cars, stop_cars
+        if cur_channel[0].state == 1:
+            if cur_channel[0].s1 >= cur_channel[0].v_lim:
+                cur_channel[0].state = 0
+                cur_channel[0].s1 -= cur_channel[0].v_lim
+                stop_cars.append(cur_channel[0])
+
+                # 对车道上的其他车进行标记
+                for i in range(1, len(cur_channel)):
+                    if cur_channel[i].state == 1:
+                        cur_channel[i].state = 0  # 车辆到达终止状态
+                        cur_channel[i].s1 = max(cur_channel[i].s1 - cur_channel[i].v_lim, cur_channel[i - 1].s1 + 1)  # 移动车辆的位置
+                        stop_cars.append(cur_channel[i])
+    return wait_cars, stop_cars
 
 
-def get_car_direction(car: Car, cur_cross_num: int, cur_road_num: int, cross_map: dict, answer_map: dict) -> int:
-    car_path_list = answer_map[car.id]
-    cur_index = car_path_list.index(cur_road_num)
+def get_car_direction(car: Car, cur_cross_num: int, cross_map: dict, answer_map: dict) -> int:
+    car_path_list = answer_map[car.id][1:]
+    if car.id == 10019 and car.cur_road_num==5024:
+        print('sad')
+    cur_index = car_path_list.index(car.cur_road_num)
     if cur_index == len(car_path_list) - 1:
-        # 进入此处表示出现错误
-        raise Exception('drive_car_in_road_to_end判断车辆是否到达终点的程序出错')
+        return 2
     in_road = car_path_list[cur_index + 1]
-    start = cross_map[cur_cross_num].index(cur_road_num)
+    start = cross_map[cur_cross_num].index(car.cur_road_num)
     end = cross_map[cur_cross_num].index(in_road)
     return (end + 4 - start) % 4
 
 
-def get_road_direction(cur_cross_num: int, cur_road_num: int, cross_map: dict, road_map: dict, answer_map: dict) -> list:
+def get_road_direction(cur_cross_num: int, cur_road_num: int, cross_map, road_map, answer_map, road_info) -> list:
     # 获取当前道路的优先级list()
     # 取当前每个通道的第一辆车判断优先级是否符合
     dir = []
@@ -330,16 +357,17 @@ def get_road_direction(cur_cross_num: int, cur_road_num: int, cross_map: dict, r
 
     # 判断是否可以左转
     dir.append(1)
-    if cur_roads_list[right_index] != -1:
+    if cur_roads_list[left_index] != -1:
         channel_top_car = []
         if cur_roads_list[right_index] != -1:  # 保证右边有车道
-            for temp_channel in road_map[cur_roads_list[right_index]][road_out[right_index]]:
-                channel_top_car += temp_channel[:1]  # 取出每个车道的最前面一辆车判断是否发生冲突
-            for temp_car in channel_top_car:
-                if temp_car.state == 1:
-                    if get_car_direction(temp_car, cur_cross_num, cur_road_num, cross_map, answer_map) == 2:
-                        dir.remove(1)
-                        break
+            if road_out[right_index] <= road_info[cur_roads_list[right_index]][-1]:
+                for temp_channel in road_map[cur_roads_list[right_index]][road_out[right_index]]:
+                    channel_top_car += temp_channel[:1]  # 取出每个车道的最前面一辆车判断是否发生冲突
+                for temp_car in channel_top_car:
+                    if temp_car.state == 1:
+                        if get_car_direction(temp_car, cur_cross_num, cross_map, answer_map) == 2:
+                            dir.remove(1)
+                            break
     else:
         dir.remove(1)
 
@@ -348,23 +376,25 @@ def get_road_direction(cur_cross_num: int, cur_road_num: int, cross_map: dict, r
     if cur_roads_list[right_index] != -1:
         channel_top_car = []
         if cur_roads_list[left_index] != -1:  # 保证左边有车道
-            for temp_channel in road_map[cur_roads_list[left_index]][road_out[left_index]]:
-                channel_top_car += temp_channel[:1]  # 取出每个车道的最前面一辆车判断是否发生冲突
-            for temp_car in channel_top_car:
-                if temp_car.state == 1:
-                    if get_car_direction(temp_car, cur_cross_num, cur_road_num, cross_map, answer_map) == 2:
-                        dir.remove(3)
-                        break
+            if road_out[left_index] <= road_info[cur_roads_list[left_index]][-1]:
+                for temp_channel in road_map[cur_roads_list[left_index]][road_out[left_index]]:
+                    channel_top_car += temp_channel[:1]  # 取出每个车道的最前面一辆车判断是否发生冲突
+                for temp_car in channel_top_car:
+                    if temp_car.state == 1:
+                        if get_car_direction(temp_car, cur_cross_num, cross_map, answer_map) == 2:
+                            dir.remove(3)
+                            break
         if cur_roads_list[direct_index] != -1 and (3 in dir):
-            channel_top_car = []
-            temp_dir = []
-            for temp_channel in road_map[cur_roads_list[direct_index]][road_out[direct_index]]:
-                channel_top_car += temp_channel[:1]  # 取出每个车道的最前面一辆车判断是否发生冲突
-            for temp_car in channel_top_car:
-                if temp_car.state == 1:
-                    temp_dir.append(get_car_direction(temp_car, cur_cross_num, cur_road_num, cross_map, answer_map))
-            if 2 not in temp_dir and 1 in temp_dir:
-                dir.remove(3)
+            if road_out[direct_index] <= road_info[cur_roads_list[direct_index]][-1]:
+                channel_top_car = []
+                temp_dir = []
+                for temp_channel in road_map[cur_roads_list[direct_index]][road_out[direct_index]]:
+                    channel_top_car += temp_channel[:1]  # 取出每个车道的最前面一辆车判断是否发生冲突
+                for temp_car in channel_top_car:
+                    if temp_car.state == 1:
+                        temp_dir.append(get_car_direction(temp_car, cur_cross_num, cross_map, answer_map))
+                if (2 not in temp_dir) and (1 in temp_dir):
+                    dir.remove(3)
     else:
         dir.remove(3)
     return dir
@@ -376,37 +406,64 @@ def get_in_road(cur_cross: int, cur_road: int, dir: int, cross_map: dict, road_m
     in_road_index = (cur_index + dir) % 4
     in_road_number = cross_road_list[in_road_index]
     # 双向车道，判断是走正还是反
-    in_road = road_map[in_road_number][0] if in_road_index < 2 else road_map[in_road_number][1]
-    return in_road, in_road_number
+    is_reverse = 0 if in_road_index < 2 else 1
+    in_road = road_map[in_road_number][is_reverse]
+    return in_road, in_road_number, is_reverse
 
 
 def one_second(road_info, road_map, answer_map, cross_map):
     wait_cars = []
+    stop_cars = []
     for cur_road_num in road_map:
         for cur_dir_road in road_map[cur_road_num]:
             for cur_channel in cur_dir_road:
-                wait_cars += drive_car_in_road_to_end(cur_road_num, cur_channel, answer_map)[0]
+                wait_car, stop_car = drive_car_in_road_to_end(cur_road_num, cur_channel, answer_map, state=0)
+                wait_cars += wait_car
+                stop_cars += stop_car
 
+    # 如果道路上的等待车辆加停止车辆数量总和为0，则表示完成整个调度过程
+    if len(wait_cars + stop_cars) == 0:
+        return 0
+    sum_wait = -1
     while wait_cars:
+        if len(wait_cars) == sum_wait and sum_wait != 0:
+            raise Exception('死锁')
+        else:
+            sum_wait = len(wait_cars)
         for cur_cross_num in cross_map:
             cross_road_list = list(filter(lambda x: x != -1, cross_map[cur_cross_num][:]))
             cross_road_list.sort()
             for cur_road_num in cross_road_list:
-                road_wait_car = list(filter(lambda x: x.road_num == cur_road_num, wait_cars))
-                dir_list = get_road_direction(cur_cross_num, cur_road_num, cross_map, road_map, answer_map)
+                road_wait_car = []
+                for temp in wait_cars:
+                    if temp.cur_road_num == cur_road_num and road_info[cur_road_num][4 - temp.is_reverse] == cur_cross_num:
+                        road_wait_car.append(temp)
+                dir_list = get_road_direction(cur_cross_num, cur_road_num, cross_map, road_map, answer_map, road_info)
+                sum_wait_road = -1
                 while road_wait_car:
+                    if len(road_wait_car) == sum_wait_road and sum_wait_road != 0:
+                        raise Exception('死锁{} {}'.format(cur_cross_num, cur_road_num))
+                    else:
+                        sum_wait_road = len(road_wait_car)
                     dir, car = get_car_from_road(cur_road_num, cur_cross_num, road_map, cross_map, answer_map, dir_list)
-                    in_road, next_road_num = get_in_road(cur_cross_num, cur_road_num, dir, cross_map, road_map)
-                    if in_road[-1] and in_road[-1][-1].s1 == in_road[-1][-1].length - 1:
+                    if car.id == 10240:
+                        print('this')
+                    in_road, next_road_num, is_reverse = get_in_road(cur_cross_num, cur_road_num, dir, cross_map, road_map)
+                    if in_road[-1] and in_road[-1][-1].s1 >= in_road[-1][-1].road_length - 1:
                         break
                     channel = car.getChannel(in_road)
-                    car.moveToNextRoad(channel, cur_road_num, next_road_num, road_info)
-                    road_wait_car.remove(car)
+                    old_channel = car.moveToNextRoad(channel, next_road_num, is_reverse, road_info)
+                    try:
+                        road_wait_car.remove(car)
+                    except:
+                        print('s')
+                    wait_cars.remove(car)
 
-                    stop_cars = drive_car_in_road_to_end(cur_road_num, channel, answer_map)[1]
+                    stop_cars = drive_car_in_road_to_end(cur_road_num, old_channel, answer_map, state=1)[1]
                     for temp in stop_cars:
+                        road_wait_car.remove(temp)
                         wait_cars.remove(temp)
-
+    return 1
 
 def drive_car_into_road(cur_time_step, car_map, answer_map, road_info, cross_map, answer_road_path):
     # 找到这个时间出发的车放在cars_ready中
@@ -439,13 +496,13 @@ def drive_car_into_road(cur_time_step, car_map, answer_map, road_info, cross_map
             for i in range(len(in_road)):
                 if in_road[i] == [] or len_road - in_road[i][-1].s1 > v_lim:
                     car = Car(id=car_id, v_lim=v_lim, s1=len_road - v_lim,
-                              length=len_road, channel=in_road[i], cur_road_num=start_road)
+                              length=len_road, channel=in_road[i], cur_road_num=start_road, is_reverse=is_reverse)
                     in_road[i].append(car)
                     break
                 elif in_road[i][-1].s1 != len_road - 1:
                     s1 = in_road[i][-1].s1
                     car = Car(id=car_id, v_lim=v_lim, s1=s1 + 1, length=len_road,
-                              channel=in_road[i], cur_road_num=start_road)
+                              channel=in_road[i], cur_road_num=start_road, is_reverse=is_reverse)
                     in_road[i].append(car)
                     break
     return delay_cars + answer_road_path
@@ -486,25 +543,49 @@ if __name__ == '__main__':
     cross_path = r'D:\Users\yyh\Pycharm_workspace\leetcode\cross.txt'
 
     carData, roadData, crossData = read_data(car_path, road_path, cross_path)
-    cross_road_map, adjacent_matrix, edges = create_road_between_cross_graph(roadData, crossData)
-    answer_node_path = generate_cross_path(carData, edges)
-    answer_road_path = generate_answer(answer_node_path, cross_road_map)
 
-    answer_road_path = update_departure_time(answer_road_path)
+    ###############################################################
+    with open(answer_path) as f:
+        answer_road_path = []
+        head = f.readline()[2: -2].split(',')
+        line = f.readline()
+        while line:
+            line = line.strip('(').strip('\n').strip(')').split(",")
+            answer_road_path.append(list(map(int, line)))
+            line = f.readline()
+    answer_road_path.sort(key=lambda x: x[1])
+    ################################################################
+
+
+    cross_road_map, adjacent_matrix, edges = create_road_between_cross_graph(roadData, crossData)
+    # answer_node_path = generate_cross_path(carData, edges)
+    # answer_road_path = generate_answer(answer_node_path, cross_road_map)
+    # answer_road_path = update_departure_time(answer_road_path)
     # write_answer_file(answer_road_path, answer_path)
+
 
     # 下面是新增的代码
     road_map, road_info, answer_map, cross_map, car_map = generate_road_map(roadData,
                                                                             crossData,
                                                                             carData,
                                                                             answer_road_path)
-    cur_time_step = 1
+    time_step = 1
 
-    answer_road_path = drive_car_into_road(cur_time_step,
-                                           car_map,
-                                           answer_map,
-                                           road_info,
-                                           cross_map,
-                                           answer_road_path)
+    print(check_road(road_map))
+    print(time_step)
+    answer_road_path = drive_car_into_road(time_step, car_map, answer_map,
+                                           road_info, cross_map, answer_road_path)
 
-    road_map = one_second(road_info, road_map, answer_map, cross_map)
+    one_second(road_info, road_map, answer_map, cross_map)
+    answer_road_path = drive_car_into_road(time_step, car_map, answer_map, road_info, cross_map, answer_road_path)
+
+    one_second(road_info, road_map, answer_map, cross_map)
+    answer_road_path = drive_car_into_road(time_step, car_map, answer_map, road_info, cross_map, answer_road_path)
+
+    one_second(road_info, road_map, answer_map, cross_map)
+    answer_road_path = drive_car_into_road(time_step, car_map, answer_map, road_info, cross_map, answer_road_path)
+
+    while one_second(road_info, road_map, answer_map, cross_map):
+        answer_road_path = drive_car_into_road(time_step, car_map, answer_map, road_info, cross_map, answer_road_path)
+        time_step += 1
+        print(time_step)
